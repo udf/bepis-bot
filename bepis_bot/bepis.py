@@ -46,17 +46,15 @@ class BepisClient(TelegramClient):
 
     namespace = f'{namespace}.' if namespace else ''
     specs = {}
-    for spec in iter_module_specs(path, plugin_names):
-      short_name = f'{namespace}{spec.name}'
-
-      if self._plugins[short_name]._module:
-        conflict = self._plugins[short_name]._module
+    for spec in iter_module_specs(path, plugin_names, prefix=namespace):
+      if self._plugins[spec.name]._module:
+        conflict = self._plugins[spec.name]._module
         raise ValueError(
-          f'Plugin name collision when importing {spec.origin} as {short_name}! '
+          f'Plugin name collision when importing {spec.origin} as {spec.name}! '
           f'Plugin already loaded from {conflict.__file__}'
           '\nConsider passing/changing the namespace to load_plugins().'
         )
-      specs[short_name] = spec
+      specs[spec.name] = spec
 
     for name, spec in specs.items():
       module = importlib.util.module_from_spec(spec)
