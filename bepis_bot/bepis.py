@@ -1,28 +1,17 @@
-from collections import defaultdict
 import importlib
 import logging
 import pkgutil
 import sys
 import types
+from collections import defaultdict
 
 from telethon import TelegramClient
-import telethon
 
+from .utils import keydefaultdict, iter_module_specs
+from .errors import PluginNotLoadedError
 # Insert runtime module so plugins can import it by name
 from . import runtime
 sys.modules['bepis_bot.runtime'] = runtime
-
-
-class keydefaultdict(defaultdict):
-  def __missing__(self, key):
-    if self.default_factory is None:
-      raise KeyError(key)
-    ret = self[key] = self.default_factory(key)
-    return ret
-
-
-class PluginNotLoadedError(Exception):
-  pass
 
 
 class PluginModule:
@@ -43,14 +32,22 @@ class BepisClient(TelegramClient):
     self._plugins = keydefaultdict(PluginModule)
     self.me = None
 
-  async def load_plugins_from_dir(self, path, namespace=None):
+  async def load_plugins(self, path, plugin_names=None, namespace=''):
+    """
+    Loads plugins from a path
+
+    :param str path: Path to load plugins from
+    :param list plugin_names:
+      Plugins to load from path, if unspecified all plugins will be loaded
+    :param str namespace:
+      Namespace to prefix the internal name of the plugin, useful if you have
+      multiple plugins with the same name, defaults to empty
+    """
+
     namespace = f'{namespace}.' if namespace else ''
     specs = {}
-
-    for info in pkgutil.iter_modules([str(path)]):
-      short_name = f'{namespace}{info.name}'
-      name = f'bepis._plugins.{short_name}'
-      spec = info.module_finder.find_spec(info.name)
+    for spec in iter_module_specs(path, plugin_names):
+      short_name = f'{namespace}{spec.name}'
 
       if self._plugins[short_name]._module:
         conflict = self._plugins[short_name]._module
@@ -71,11 +68,3 @@ class BepisClient(TelegramClient):
       except:
         self.logger.exception(f'Unexpected exception loading plugin')
       self._plugins[name]._module = module
-
-  async def load_plugins(self, paths, namespace=None):
-    "Loads all plugins from the specified path(s)"
-    if not telethon.utils.is_list_like(paths):
-      paths = [paths]
-
-    for path in paths:
-      await self.load_plugins_from_dir(path, namespace)
