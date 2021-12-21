@@ -20,7 +20,7 @@ class BepisClient(TelegramClient):
 
   def make_plugin_getter(self, namespace):
     def wrapped(name):
-      return self._plugins[f'{namespace}.{name}']
+      return self._plugins[f'{namespace}{name}']
     return wrapped
 
   async def load_plugins(self, path, plugin_names=None, namespace=''):
