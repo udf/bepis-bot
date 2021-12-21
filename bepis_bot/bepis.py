@@ -1,28 +1,14 @@
 import importlib
 import logging
-import pkgutil
 import sys
-import types
-from collections import defaultdict
 
 from telethon import TelegramClient
 
+from .classes import PluginModule
 from .utils import keydefaultdict, iter_module_specs
-from .errors import PluginNotLoadedError
 # Insert runtime module so plugins can import it by name
 from . import runtime
 sys.modules['bepis_bot.runtime'] = runtime
-
-
-class PluginModule:
-  def __init__(self, name: str):
-    self._name = name
-    self._module: types.ModuleType = None
-
-  def __getattr__(self, name):
-    if not self._module:
-      raise PluginNotLoadedError(f'Plugin "{self._name}" is not loaded')
-    return getattr(self._module, name)
 
 
 class BepisClient(TelegramClient):
@@ -31,6 +17,11 @@ class BepisClient(TelegramClient):
     self.logger = logging.getLogger('bepis')
     self._plugins = keydefaultdict(PluginModule)
     self.me = None
+
+  def make_plugin_getter(self, namespace):
+    def wrapped(name):
+      return self._plugins[f'{namespace}.{name}']
+    return wrapped
 
   async def load_plugins(self, path, plugin_names=None, namespace=''):
     """
@@ -56,13 +47,26 @@ class BepisClient(TelegramClient):
         )
       specs[spec.name] = spec
 
+    modules = []
     for name, spec in specs.items():
       module = importlib.util.module_from_spec(spec)
       self.logger.info(f'Loading plugin {name} from {module.__file__}')
       runtime.client = self
       runtime.logger = logging.getLogger(name)
+      runtime.require = self.make_plugin_getter(namespace)
       try:
         spec.loader.exec_module(module)
       except:
         self.logger.exception(f'Unexpected exception loading plugin')
+        raise
       self._plugins[name]._module = module
+      modules.append(module)
+
+    for module in modules:
+      on_load = getattr(module, 'on_load', None)
+      if on_load:
+        try:
+          await on_load()
+        except:
+          self.logger.exception(f'Unexpected exception initializing plugin')
+          raise
