@@ -6,6 +6,7 @@ from telethon import TelegramClient
 
 from .classes import PluginModule
 from .utils import keydefaultdict, iter_module_specs
+from .constants import plugin_prefix
 
 
 class BepisClient(TelegramClient):
@@ -34,15 +35,15 @@ class BepisClient(TelegramClient):
 
     namespace = f'{namespace}.' if namespace else ''
     specs = {}
-    for spec in iter_module_specs(path, plugin_names, prefix=namespace):
-      if self._plugins[spec.name]._module:
-        conflict = self._plugins[spec.name]._module
+    for (name, spec) in iter_module_specs(path, plugin_names, prefix=namespace):
+      if self._plugins[name]._module:
+        conflict = self._plugins[name]._module
         raise ValueError(
-          f'Plugin name collision when importing {spec.origin} as {spec.name}! '
+          f'Plugin name collision when importing {spec.origin} as {name}! '
           f'Plugin already loaded from {conflict.__file__}'
           '\nConsider passing/changing the namespace to load_plugins().'
         )
-      specs[spec.name] = spec
+      specs[name] = spec
 
     modules = []
     for name, spec in specs.items():
@@ -51,11 +52,15 @@ class BepisClient(TelegramClient):
       runtime.client = self
       runtime.logger = logging.getLogger(name)
       runtime.require = self.make_plugin_getter(namespace)
+      # allow relative imports inside plugin modules
+      sys.modules[spec.name] = module
       try:
         spec.loader.exec_module(module)
       except:
         self.logger.exception(f'Unexpected exception loading plugin')
         raise
+      finally:
+        del sys.modules[spec.name]
       self._plugins[name]._module = module
       modules.append(module)
 
