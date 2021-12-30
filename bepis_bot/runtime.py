@@ -1,10 +1,9 @@
 from logging import Logger
 import typing
-from telethon import TelegramClient
 
+from .bepis import BepisClient
 from .classes import PluginModule
 
-
-client: TelegramClient
+client: BepisClient
 logger: Logger
 require: typing.Callable[[str], PluginModule]

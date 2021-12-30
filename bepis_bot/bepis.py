@@ -6,9 +6,6 @@ from telethon import TelegramClient
 
 from .classes import PluginModule
 from .utils import keydefaultdict, iter_module_specs
-# Insert runtime module so plugins can import it by name
-from . import runtime
-sys.modules['bepis_bot.runtime'] = runtime
 
 
 class BepisClient(TelegramClient):
@@ -70,3 +67,8 @@ class BepisClient(TelegramClient):
         except:
           self.logger.exception(f'Unexpected exception initializing plugin')
           raise
+
+
+# Insert runtime module so plugins can import it by name
+from . import runtime
+sys.modules['bepis_bot.runtime'] = runtime
