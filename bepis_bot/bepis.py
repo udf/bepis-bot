@@ -10,11 +10,11 @@ from .constants import plugin_prefix
 
 
 class BepisClient(TelegramClient):
-  def __init__(self, *args, **kwargs):
+  def __init__(self, *args, plugin_config=None, **kwargs):
     super().__init__(*args, **kwargs)
     self.logger = logging.getLogger('bepis')
     self._plugins = keydefaultdict(PluginModule)
-    self.me = None
+    self._config = plugin_config
 
   def make_plugin_getter(self, namespace):
     def wrapped(name):
@@ -52,6 +52,7 @@ class BepisClient(TelegramClient):
       runtime.client = self
       runtime.logger = logging.getLogger(name)
       runtime.require = self.make_plugin_getter(namespace)
+      runtime.config = self._config
       # allow relative imports inside plugin modules
       sys.modules[spec.name] = module
       try:
